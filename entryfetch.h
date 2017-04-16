@@ -6,6 +6,8 @@
 #include <QPointer>
 #include <QNetworkReply>
 
+#define COMPOS_PATH "/home/sandsmark/tg/entries/"
+
 struct DownloadJob {
     QUrl url;
     QString filePath;
@@ -47,7 +49,11 @@ struct Entry {
         return true;
     }
     QString filePath() {
-        return QString(compoName + "/" + entryName + "_by_" + author + "." + fileExtension).replace(" ", "_");
+        QString ret(compoName + "/" + entryName + "_by_" + author + "." + fileExtension);
+        ret.replace(" ", "_");
+        ret.replace("/", "_");
+        return COMPOS_PATH + ret;
+
 //        return compoName + "/" + entryName.replace(" ", ".") + ".2017." + compoName + "-" + author.replace(" ", ".") + "." + fileExtension;
     }
 };

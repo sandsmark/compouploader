@@ -5,7 +5,6 @@
 #include <QJsonArray>
 #include <QDir>
 
-#define COMPOS_PATH "/home/sandsmark/tg/entries/"
 
 
 EntryFetch::EntryFetch(QObject *parent) : QObject(parent)
@@ -244,6 +243,7 @@ void EntryFetch::fetchNextEntry()
     Entry entry;
     while (!m_entries.isEmpty()) {
         entry = m_entries.takeFirst();
+        qDebug() << "checking if exists" << entry.filePath() << QFile::exists(entry.filePath());
         if (QFile::exists(entry.filePath())) {
             qDebug() << "Skipping already downloaded file" << entry.filePath();
             continue;
@@ -251,9 +251,13 @@ void EntryFetch::fetchNextEntry()
             break;
         }
     }
+    if (QFile::exists(entry.filePath())) {
+        qWarning() << "File exists" << entry.filePath();
+        qApp->quit();
+    }
 
     QNetworkReply *entryReply = m_nam.get(QNetworkRequest(entry.url));
-    QFile *file = new QFile(COMPOS_PATH + entry.filePath(), entryReply);
+    QFile *file = new QFile(entry.filePath(), entryReply);
     if (!file->open(QIODevice::WriteOnly)) {
         qWarning() << "Failed to open" << file->fileName();
         entryReply->deleteLater();
