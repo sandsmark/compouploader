@@ -243,9 +243,7 @@ void EntryFetch::fetchNextEntry()
     Entry entry;
     while (!m_entries.isEmpty()) {
         entry = m_entries.takeFirst();
-        qDebug() << "checking if exists" << entry.filePath() << QFile::exists(entry.filePath());
         if (QFile::exists(entry.filePath())) {
-            qDebug() << "Skipping already downloaded file" << entry.filePath();
             continue;
         } else {
             break;
