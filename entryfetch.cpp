@@ -200,7 +200,7 @@ void EntryFetch::onCompoFetched()
         }
 
         if (potentials.isEmpty()) {
-            qWarning().noquote() << "No files for entry" << QJsonDocument(val.toObject()).toJson();
+            qWarning() << "No files for entry" << QJsonDocument(val.toObject()).toJson();
             qWarning() << compoName << compoGenre;
             continue;
         }
@@ -241,7 +241,17 @@ void EntryFetch::fetchNextEntry()
         qApp->quit();
         return;
     }
-    Entry entry = m_entries.takeFirst();
+    Entry entry;
+    while (!m_entries.isEmpty()) {
+        entry = m_entries.takeFirst();
+        if (QFile::exists(entry.filePath())) {
+            qDebug() << "Skipping already downloaded file" << entry.filePath();
+            continue;
+        } else {
+            break;
+        }
+    }
+
     QNetworkReply *entryReply = m_nam.get(QNetworkRequest(entry.url));
     QFile *file = new QFile(COMPOS_PATH + entry.filePath(), entryReply);
     if (!file->open(QIODevice::WriteOnly)) {
