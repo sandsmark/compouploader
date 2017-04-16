@@ -49,10 +49,10 @@ struct Entry {
         return true;
     }
     QString filePath() {
-        QString ret(compoName + "/" + entryName + "_by_" + author + "." + fileExtension);
+        QString ret(entryName + "_by_" + author + "." + fileExtension);
         ret.replace(" ", "_");
         ret.replace("/", "_");
-        return COMPOS_PATH + ret;
+        return COMPOS_PATH + compoName + "/" + ret;
 
 //        return compoName + "/" + entryName.replace(" ", ".") + ".2017." + compoName + "-" + author.replace(" ", ".") + "." + fileExtension;
     }
