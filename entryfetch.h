@@ -6,7 +6,7 @@
 #include <QPointer>
 #include <QNetworkReply>
 
-#define COMPOS_PATH "/home/sandsmark/tg/entries/"
+#define COMPOS_PATH "/home/sandsmark/tg/entries18/"
 
 struct DownloadJob {
     QUrl url;
@@ -61,7 +61,8 @@ struct Entry {
 struct Compo {
     QString name;
     QString id;
-    bool isValid() { return !name.isEmpty() && !id.isEmpty(); }
+    QString genre;
+    bool isValid() { return !name.isEmpty() && !id.isEmpty() && !genre.isEmpty(); }
 };
 
 class EntryFetch : public QObject
@@ -79,7 +80,7 @@ public slots:
 private slots:
     void onComposFetched();
     void fetchNextCompo();
-    void onCompoFetched();
+    void onCompoFetched(QNetworkReply *entryReply, const Compo compo);
     void fetchNextEntry();
 
 private:
@@ -87,6 +88,7 @@ private:
     QPointer<QNetworkReply> m_entriesReply;
     QList<Compo> m_compos;
     QList<Entry> m_entries;
+//    QMap<QString, Compo> m_compos;
     QMultiMap<QString, QString> m_extensions;
 };
 

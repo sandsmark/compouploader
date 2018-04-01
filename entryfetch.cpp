@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDir>
+#include <QRegularExpression>
 
 
 
@@ -21,14 +22,17 @@ EntryFetch::~EntryFetch()
 
 void EntryFetch::fetchCompos()
 {
-    QUrl entriesUrl("http://unicorn.gathering.org/api/beamer/competitions");
+    QUrl entriesUrl("https://unicorn.gathering.org/api/beamer/competitions");
     m_entriesReply = m_nam.get(QNetworkRequest(entriesUrl));
     connect(m_entriesReply, &QNetworkReply::finished, this, &EntryFetch::onComposFetched);
     connect(m_entriesReply, &QNetworkReply::finished, m_entriesReply, &QNetworkReply::deleteLater);
 }
 
-static void capitalize(QString &string)
+static void fixName(QString &string)
 {
+    string.remove(QRegularExpression("\\([^\\)]*\\)"));
+    string.remove("'");
+    string.replace(QRegularExpression("\\W"), " ");
     QStringList parts = string.split(' ', QString::SkipEmptyParts);
     for (QString &part : parts) {
         part[0] = part[0].toUpper();
@@ -39,7 +43,18 @@ static void capitalize(QString &string)
 
 void EntryFetch::onComposFetched()
 {
-    static const QStringList bannedCompos(QStringList() << "Casemod" << "Hacking" << "ProIntro&SoundDesign" << "TheGatheringProgrammingChampionship");
+    static const QSet<QString> bannedCompos({
+        "the-gathering-hacking-competition-tghack",
+        "the-gathering-programming-championship",
+        "google-blocks-konkurranse-i-virtual-reality-",
+        "dragon39s-den-game-pitch",
+        "vr-demo-konkurranse",
+    });
+    static const QSet<QString> bannedCategories({
+        "gaming",
+        "other",
+        "community",
+    });
 
     if (!m_entriesReply) {
         qWarning() << "no fetch reply";
@@ -51,9 +66,8 @@ void EntryFetch::onComposFetched()
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(m_entriesReply->readAll());
+
 //    qDebug().noquote() << doc.toJson();
-//    qApp->quit();
-//    return;
 
     QJsonArray datas = doc.object()["data"].toArray();
     for (const QJsonValue &val : datas) {
@@ -61,24 +75,34 @@ void EntryFetch::onComposFetched()
 
         Compo compo;
         compo.name = obj["name"].toString();
-        capitalize(compo.name);
-        if (bannedCompos.contains(compo.name)) {
+        fixName(compo.name);
+        if (bannedCompos.contains(obj["slug"].toString())) {
             qWarning() << " - Skipping banned compo" << compo.name;
             continue;
         }
-        if (obj["genre"].toString() == "gaming") {
-            qWarning() << " - Skipping game compo" << compo.name;
+
+        const QString compoGenre = obj["genre"].toString();
+        if (bannedCategories.contains(compoGenre)) {
+            qWarning() << " - Skipping compo in wrong category" << compo.name << compoGenre;
             continue;
         }
-//        qDebug() << compo.name << obj["genre"].toString();
 
+        compo.genre = compoGenre;
         compo.id = obj["id"].toString();
         if (!compo.isValid()) {
             qWarning() << "Invalid compo" << val;
-            continue;
+            qApp->quit();
+            return;
         }
+
+        qDebug() << "Fetching comp" << compo.name;
         m_compos.append(compo);
     }
+
+    qDebug().noquote() << "\n========= Compos listed =========\n";
+
+//    qApp->quit();
+//    return;
 
     fetchNextCompo();
 }
@@ -86,17 +110,19 @@ void EntryFetch::onComposFetched()
 void EntryFetch::fetchNextCompo()
 {
     if (m_compos.isEmpty()) {
-        qWarning() << "No more compos";
+        qDebug().noquote() << "\n========= All compos fetched =========\n";
         fetchNextEntry();
         return;
     }
 
     Compo compo = m_compos.takeFirst();
-    qDebug() << " Fetching compo" << compo.name << compo.id;
-    QUrl entryUrl("http://unicorn.gathering.org/api/beamer/entries/" + compo.id);
+    qDebug() << " > Fetching compo" << compo.name << compo.id;
+    QUrl entryUrl("https://unicorn.gathering.org/api/beamer/results/" + compo.id);
     QNetworkReply *entryReply = m_nam.get(QNetworkRequest(entryUrl));
     connect(entryReply, &QNetworkReply::finished, entryReply, &QNetworkReply::deleteLater);
-    connect(entryReply, &QNetworkReply::finished, this, &EntryFetch::onCompoFetched);
+    connect(entryReply, &QNetworkReply::finished, this, [=]() {
+        onCompoFetched(entryReply, compo);
+    });
     connect(entryReply, &QNetworkReply::finished, this, &EntryFetch::fetchNextCompo);
 }
 
@@ -121,111 +147,68 @@ bool isCorrectFiletype(const QString &extension, const QString &genre)
         return musicExtensions.contains(extension);
     } else {
         qWarning() << "Unknown genre" << genre;
+        qApp->quit();
+        return false;
     }
 
     return false;
 
 }
 
-static Entry createEntry(const QJsonObject &fileObj)
+void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
 {
-    Entry entry;
-    entry.url = QUrl(fileObj["url"].toString());
-    entry.fileExtension = fileObj["extension"].toString();
-    entry.filetype = fileObj["filetype"].toString();
-    return entry;
-}
-
-void EntryFetch::onCompoFetched()
-{
-    QNetworkReply *entryReply = qobject_cast<QNetworkReply*>(sender());
-    if (!entryReply) {
-        qWarning() << "no fetch reply";
-        return;
-    }
     if (entryReply->error() != QNetworkReply::NoError) {
         qWarning() << entryReply->errorString();
+        qApp->quit();
         return;
     }
-    QJsonDocument doc = QJsonDocument::fromJson(entryReply->readAll());
-    QJsonObject compoObject = doc.object();
+    const QJsonDocument doc = QJsonDocument::fromJson(entryReply->readAll());
+    const QJsonObject replyObject = doc.object();
+    const QJsonObject compoObject = replyObject["data"].toObject();
 
-//    qDebug().noquote() << doc.toJson();
-//    return;
-
-    QString compoName = compoObject["title"].toString();
+    QString compoName = compo.name;
     if (compoName.isEmpty()) {
-        qWarning() << "Invalid compo title" << doc.toJson(QJsonDocument::Compact);
+        qWarning() << "Invalid compo title";
+        qDebug().noquote() << doc.toJson();
+        qApp->quit();
         return;
     }
 
-    capitalize(compoName);
-    QString compoGenre = compoObject["genre"].toString();
+    QString compoGenre = compo.genre;
     if (compoGenre.isEmpty()) {
-        qWarning() << "Invalid compo genre" << doc.toJson(QJsonDocument::Compact);
+        qWarning() << "Invalid compo genre";
+        qDebug().noquote() << doc.toJson();
+        qApp->quit();
         return;
     }
-    qDebug() << " Compo" << compoName << "fetched";
+    qDebug() << " < Compo" << compoName << "fetched";
     QDir().mkpath(COMPOS_PATH + compoName + "/");
 
-    QJsonArray entries = compoObject["data"].toArray();
+    QJsonArray entries = compoObject["results"].toArray();
     for (const QJsonValue &val : entries) {
-        QJsonObject compoEntryObj = val.toObject();
-
-
-        // Fetch main entry
-        QList<Entry> potentials;
-        {
-            Entry mainEntry = createEntry(compoEntryObj["main_entry"].toObject());
-            if (isCorrectFiletype(mainEntry.fileExtension, compoGenre)) {
-                potentials.append(mainEntry);
-            }
+        const QJsonObject compoEntryObj = val.toObject();
+        const QJsonArray filesArray = compoEntryObj["files"].toArray();
+        if (filesArray.isEmpty()) {
+            qWarning() << "no files";
+            qDebug().noquote() << QJsonDocument(compoEntryObj).toJson();
+            qApp->quit();
+            return;
         }
+        const QJsonObject fileObj = filesArray.first().toObject();
 
+        Entry entry;
+        entry.url = QUrl(fileObj["url"].toString());
+        entry.fileExtension = fileObj["extension"].toString();
+        entry.filetype = fileObj["filetype"].toString();
 
-        if (potentials.isEmpty()) {
-            for (const QJsonValue &fileVal : compoEntryObj["files"].toArray()) {
-                QJsonObject fileObj = fileVal.toObject();
-                Entry entry = createEntry(fileObj);
-                if (isCorrectFiletype(entry.fileExtension, compoGenre)) {
-                    potentials.append(entry);
-                }
-            }
-        }
-
-        if (potentials.length() > 1) {
-            qWarning() << "To many potential entries for" << val << compoGenre;
-            continue;
-        }
-
-        if (potentials.isEmpty()) {
-            qWarning() << "No files for entry" << QJsonDocument(val.toObject()).toJson();
-            qWarning() << compoName << compoGenre;
-            continue;
-        }
-
-//        if (potentials.length() > 1) {
-//            QMutableListIterator<Entry> it(potentials);
-//            while (it.hasNext()) {
-//                const Entry &entry = it.next();
-//                if (!isCorrectFiletype(entry.fileExtension, compoGenre)) {
-//                    qDebug() << "Invalid file type" << entry.filetype << compoGenre;
-//                    it.remove();
-//                    continue;
-//                }
-//            }
-//        }
-//        if (potentials.isEmpty()) {
-//            qWarning() << "No valid files for" << val << compoGenre;
-//            continue;
-//        }
-        Entry entry = potentials.first();
         entry.compoName = compoName;
-        entry.entryName = compoEntryObj["name"].toString();
+        entry.entryName = compoEntryObj["title"].toString();
         entry.author = compoEntryObj["author"].toString();
 
         if (!entry.isValid()) {
-            qWarning() << "Invalid entry" << val;
+            qWarning() << "Invalid entry";
+            qDebug().noquote() << QJsonDocument(compoEntryObj).toJson();
+            qApp->quit();
             continue;
         }
 
@@ -235,11 +218,11 @@ void EntryFetch::onCompoFetched()
 
 void EntryFetch::fetchNextEntry()
 {
-    if (m_entries.isEmpty()) {
-        qDebug() << "All entries fetched";
+//    if (m_entries.isEmpty()) {
+        qDebug() << "========= All entries fetched =========";
         qApp->quit();
         return;
-    }
+//    }
     Entry entry;
     while (!m_entries.isEmpty()) {
         entry = m_entries.takeFirst();
@@ -252,6 +235,7 @@ void EntryFetch::fetchNextEntry()
     if (QFile::exists(entry.filePath())) {
         qWarning() << "File exists" << entry.filePath();
         qApp->quit();
+        return;
     }
 
     QNetworkReply *entryReply = m_nam.get(QNetworkRequest(entry.url));
@@ -262,7 +246,7 @@ void EntryFetch::fetchNextEntry()
         qApp->quit();
         return;
     }
-    qDebug() << "fetching entry" << entry.filePath() << "to" << file->fileName();
+    qDebug() << " Fetching entry" << entry.filePath() << "to" << file->fileName();
 
     connect(entryReply, &QNetworkReply::finished, entryReply, &QNetworkReply::deleteLater);
 
