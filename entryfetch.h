@@ -51,7 +51,7 @@ struct Entry {
     }
 
     QString filePath() {
-        QString ret(entryName + "_by_" + author);
+        QString ret(entryName + " by " + author);
         ret.replace(QRegularExpression("\\W"), " ");
         ret = ret.simplified();
         ret.replace(" ", "_");
