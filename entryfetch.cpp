@@ -67,7 +67,7 @@ void EntryFetch::onComposFetched()
 
     QJsonDocument doc = QJsonDocument::fromJson(m_entriesReply->readAll());
 
-//    qDebug().noquote() << doc.toJson();
+    qDebug() << doc.toJson();
 
     QJsonArray datas = doc.object()["data"].toArray();
     for (const QJsonValue &val : datas) {
@@ -99,7 +99,7 @@ void EntryFetch::onComposFetched()
         m_compos.append(compo);
     }
 
-    qDebug().noquote() << "\n========= Compos listed =========\n";
+    qDebug() << "\n========= Compos listed =========\n";
 
 //    qApp->quit();
 //    return;
@@ -110,7 +110,7 @@ void EntryFetch::onComposFetched()
 void EntryFetch::fetchNextCompo()
 {
     if (m_compos.isEmpty()) {
-        qDebug().noquote() << "\n========= All compos fetched =========\n";
+        qDebug() << "\n========= All compos fetched =========\n";
         fetchNextEntry();
         return;
     }
@@ -169,7 +169,7 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
     QString compoName = compo.name;
     if (compoName.isEmpty()) {
         qWarning() << "Invalid compo title";
-        qDebug().noquote() << doc.toJson();
+        qDebug() << doc.toJson();
         qApp->quit();
         return;
     }
@@ -177,7 +177,7 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
     QString compoGenre = compo.genre;
     if (compoGenre.isEmpty()) {
         qWarning() << "Invalid compo genre";
-        qDebug().noquote() << doc.toJson();
+        qDebug() << doc.toJson();
         qApp->quit();
         return;
     }
@@ -190,7 +190,7 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
         const QJsonArray filesArray = compoEntryObj["files"].toArray();
         if (filesArray.isEmpty()) {
             qWarning() << "no files";
-            qDebug().noquote() << QJsonDocument(compoEntryObj).toJson();
+            qDebug() << QJsonDocument(compoEntryObj).toJson();
             qApp->quit();
             return;
         }
@@ -207,7 +207,7 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
 
         if (!entry.isValid()) {
             qWarning() << "Invalid entry";
-            qDebug().noquote() << QJsonDocument(compoEntryObj).toJson();
+            qDebug() << QJsonDocument(compoEntryObj).toJson();
             qApp->quit();
             continue;
         }
@@ -218,11 +218,11 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
 
 void EntryFetch::fetchNextEntry()
 {
-//    if (m_entries.isEmpty()) {
+    if (m_entries.isEmpty()) {
         qDebug() << "========= All entries fetched =========";
         qApp->quit();
         return;
-//    }
+    }
     Entry entry;
     while (!m_entries.isEmpty()) {
         entry = m_entries.takeFirst();
