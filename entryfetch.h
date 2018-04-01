@@ -54,6 +54,7 @@ struct Entry {
         QString ret(entryName + "_by_" + author);
         ret.replace(QRegularExpression("\\W"), " ");
         ret.replace(" ", "_");
+        ret = ret.simplified();
 //        ret.replace("/", "_");
         return COMPOS_PATH + compoName + "/" + ret + "." + fileExtension;
 
