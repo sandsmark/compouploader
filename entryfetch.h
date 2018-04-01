@@ -5,6 +5,7 @@
 #include <QNetworkAccessManager>
 #include <QPointer>
 #include <QNetworkReply>
+#include <QRegularExpression>
 
 #define COMPOS_PATH "/home/sandsmark/tg/entries18/"
 
@@ -48,11 +49,13 @@ struct Entry {
         }
         return true;
     }
+
     QString filePath() {
-        QString ret(entryName + "_by_" + author + "." + fileExtension);
+        QString ret(entryName + "_by_" + author);
+        ret.replace(QRegularExpression("\\W"), " ");
         ret.replace(" ", "_");
-        ret.replace("/", "_");
-        return COMPOS_PATH + compoName + "/" + ret;
+//        ret.replace("/", "_");
+        return COMPOS_PATH + compoName + "/" + ret + "." + fileExtension;
 
 //        return compoName + "/" + entryName.replace(" ", ".") + ".2017." + compoName + "-" + author.replace(" ", ".") + "." + fileExtension;
     }
