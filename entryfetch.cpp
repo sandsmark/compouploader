@@ -203,6 +203,10 @@ void EntryFetch::onCompoFetched(QNetworkReply *entryReply, const Compo compo)
 
         entry.compoName = compoName;
         entry.entryName = compoEntryObj["title"].toString();
+        if (entry.entryName.isEmpty()) {
+            entry.entryName = compoEntryObj["author"].toString();
+        }
+
         entry.author = compoEntryObj["author"].toString();
 
         if (!entry.isValid()) {
