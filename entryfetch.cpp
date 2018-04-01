@@ -246,7 +246,7 @@ void EntryFetch::fetchNextEntry()
         qApp->quit();
         return;
     }
-    qDebug() << " Fetching entry" << entry.filePath() << "to" << file->fileName();
+    qDebug() << " Fetching entry" << entry.entryName << entry.url << "to" << file->fileName();
 
     connect(entryReply, &QNetworkReply::finished, entryReply, &QNetworkReply::deleteLater);
 
